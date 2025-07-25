@@ -1,31 +1,43 @@
 import streamlit as st
 import pandas as pd
 import pickle
+import os
 
-# Load the trained model
-model = pickle.load(open('LinearRegressionModel.pkl', 'rb'))
+# Load the trained model safely
+if not os.path.exists("LinearRegressionModel.pkl"):
+    st.error("❌ Model file 'LinearRegressionModel.pkl' not found.")
+    st.stop()
+
+try:
+    with open('LinearRegressionModel.pkl', 'rb') as f:
+        model = pickle.load(f)
+except Exception as e:
+    st.error(f"❌ Failed to load model: {e}")
+    st.stop()
 
 # Load the dataset
-data_file = 'Cleaned_car.csv'  # Path to your uploaded dataset
+data_file = 'Cleaned_car.csv'
+if not os.path.exists(data_file):
+    st.error("❌ Dataset 'Cleaned_car.csv' not found.")
+    st.stop()
+
 car_data = pd.read_csv(data_file)
 
-# Extract unique companies and their corresponding models
+# Group car models by company
 company_to_models = car_data.groupby('company')['name'].unique().to_dict()
 
-# Define the app title
-st.title("Car Price Prediction")
+# App title
+st.title("🚗 Car Price Prediction")
 st.write("Use this app to predict the price of a car based on its features.")
 
-# Initialize session state for storing predictions
+# Initialize session state for prediction history
 if 'predictions' not in st.session_state:
     st.session_state['predictions'] = []
 
 # Input form
 def get_user_input():
-    # Dropdown for company
     company = st.selectbox("Select Car Company", ["--Select--"] + list(company_to_models.keys()))
 
-    # Dropdown for model (based on selected company)
     if company != "--Select--":
         models = company_to_models.get(company, [])
         model_name = st.selectbox("Select Car Model", ["--Select--"] + list(models))
@@ -45,22 +57,20 @@ def get_user_input():
     })
     return user_data
 
-# Get user input
+# Get input
 data = get_user_input()
 
-# Display input data
-if data['company'][0] and data['name'][0]:
+# Display user input
+if data['company'][0] and data['name'][0] != "--Select--":
     st.subheader("User Input:")
     st.write(data)
 
 # Predict button
 if st.button("Predict Price"):
     try:
-        # Perform prediction
         prediction = model.predict(data)
         predicted_price = f"\u20B9 {prediction[0]:,.2f}"
 
-        # Store the prediction in session state
         st.session_state['predictions'].append({
             'Company': data['company'][0],
             'Model': data['name'][0],
@@ -70,13 +80,13 @@ if st.button("Predict Price"):
             'Predicted Price': predicted_price
         })
 
-        # Display predicted price
         st.subheader("Predicted Price:")
         st.write(predicted_price)
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"❌ Prediction Error: {e}")
 
-# Display all predictions
+# Show prediction history
 if st.session_state['predictions']:
-    st.subheader("Previous Predictions:")
+    st.subheader("📊 Previous Predictions:")
     st.write(pd.DataFrame(st.session_state['predictions']))
+    
